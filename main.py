@@ -10,27 +10,22 @@ def filter_offers(offers, location=None, category=None, accessible_only=False):
 
     for offer in offers:
         if not isinstance(offer, dict):
-            continue  # on saute les formats inattendus
+            continue  # On ignore les formats inattendus
 
         try:
-            title = offer.get("title", {}).get("rendered", "")
-            region = offer.get("acf", {}).get("region", "").lower()
-            thematics = offer.get("acf", {}).get("thematique", [])
-            access_info = offer.get("acf", {}).get("mobilite_reduite", "").lower()
-            description = offer.get("acf", {}).get("description", "")
+            title = offer.get("title", "")
+            region = offer.get("region", "").lower()
+            thematics = offer.get("thematique", [])
+            access_info = offer.get("mobilite_reduite", "").lower()
+            description = offer.get("description", "")
         except Exception as e:
             print(f"Erreur de parsing pour une offre : {e}")
             continue
 
-        # Filtrage par ville
         if location and location.lower() not in region:
             continue
-
-        # Filtrage par catégorie
         if category and category.lower() not in [cat.lower() for cat in thematics]:
             continue
-
-        # Filtrage accessibilité
         if accessible_only and access_info != "oui":
             continue
 
@@ -55,8 +50,8 @@ def get_filtered_offers():
         response.raise_for_status()
         all_offers = response.json()
 
-        if not isinstance(all_offers, list):
-            raise ValueError("La réponse API n'est pas une liste d'offres")
+        # Convertit le dict en liste
+        all_offers = list(all_offers.values())
 
         results = filter_offers(all_offers, location, category, accessible)
         return jsonify(results)
