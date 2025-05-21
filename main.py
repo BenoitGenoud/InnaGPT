@@ -1,40 +1,51 @@
 from flask import Flask, request, jsonify
 import requests
+import json
 
 app = Flask(__name__)
 
 API_URL = "https://www.passeport-valaisan.ch/wp-json/passval/v1/getAllOffers"
+
+def parse_category(cat_string):
+    try:
+        return json.loads(cat_string)
+    except Exception:
+        return []
 
 def filter_offers(offers, location=None, category=None, accessible_only=False):
     filtered = []
 
     for offer in offers:
         if not isinstance(offer, dict):
-            continue  # On ignore les formats inattendus
+            continue
 
         try:
-            title = offer.get("title", "")
-            region = offer.get("region", "").lower()
-            thematics = offer.get("thematique", [])
-            access_info = offer.get("mobilite_reduite", "").lower()
-            description = offer.get("description", "")
+            title = offer.get("Titre", "")
+            partner = offer.get("Partenaire", "")
+            description = offer.get("Description", "")
+            address = offer.get("Localisation", {}).get("address", "")
+            categories = parse_category(offer.get("Catégorie", "[]"))
+            # NOTE : pas d'info réelle sur l'accessibilité, donc ignorée ici
         except Exception as e:
             print(f"Erreur de parsing pour une offre : {e}")
             continue
 
-        if location and location.lower() not in region:
+        # Filtrage par lieu
+        if location and location.lower() not in address.lower():
             continue
-        if category and category.lower() not in [cat.lower() for cat in thematics]:
-            continue
-        if accessible_only and access_info != "oui":
+
+        # Filtrage par catégorie
+        if category and category.lower() not in [c.lower() for c in categories]:
             continue
 
         filtered.append({
             "title": title,
-            "region": region,
-            "category": thematics,
-            "accessible": access_info,
-            "description": description
+            "partner": partner,
+            "description": description,
+            "address": address,
+            "category": categories,
+            "image": offer.get("Image", ""),
+            "discount": offer.get("Rabais", "")
         })
 
     return filtered
@@ -48,11 +59,7 @@ def get_filtered_offers():
     try:
         response = requests.get(API_URL)
         response.raise_for_status()
-        all_offers = response.json()
-
-        # Convertit le dict en liste
-        all_offers = list(all_offers.values())
-
+        all_offers = list(response.json().values())
         results = filter_offers(all_offers, location, category, accessible)
         return jsonify(results)
 
